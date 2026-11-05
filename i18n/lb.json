@@ -188,10 +188,14 @@
     "circuits": {
       "addMainCircuit": "Haaptstroumkrees derbäi fügen",
       "addSubCircuit": "Ënnergeuerdnete Stroumkrees derbäi fügen",
+      "assignmentFailed": "D'Aufgab konnt net gespäichert ginn. Probéiert et nach eng Kéier.",
       "description": "Sécherstellen, datt d'Zomm vun all den Luedstatiounen an Heizungen déi mam Circuit verbonne sinn net déi konfiguréiert Leeschtung an aktuell Grenzen iwwerschreit. Circuiten kënnen agenist ginn fir eng Hierarchie opzebauen.",
+      "dragHint": "Zitt op e Circuit oder tippt fir ze wielen.",
       "legacyWarning": "Nei Konfiguratioun vun de Stroumkreesser verfügbar! Läsch a späicher hei deng Konfiguratioun, fir de neie geleetene Prozess ze benotzen. Duerno ass e Neistart néideg.",
       "meterDedicated": "Zieler",
       "meterGrid": "Netz",
+      "selectAssign": "Tippt op e Circuit fir {title} zouzeweisen.",
+      "selectMove": "Tippt op e Circuit fir {title} ze réckelen, oder op de Pool fir en ze läschen.",
       "title": "Management vun der Belaaschtung",
       "usableMeters": "Verwendbar Zielerreferenzen"
     },
@@ -230,6 +234,15 @@
       "title": "Limitatioun",
       "titleAdd": "Aspeisebegrenzung derbäi fügen",
       "titleEdit": "Aspeisebegrenzung beaarbechten"
+    },
+    "deviceRef": {
+      "add": {
+        "charger": "Opluedgerät derbäisetzen",
+        "meter": "Zieler derbäisetzen",
+        "switch": "Schaltbar Steckdous derbäisetzen",
+        "tariff": "Tarif derbäisetzen"
+      },
+      "noNesting": "D'Anisten ass op een Niveau limitéiert. Wielt wgl. eng aner Optioun."
     },
     "deviceValue": {
       "activeClients": "Aktiv Clienten",
@@ -309,6 +322,7 @@
           "returnEnergy": "Entlueden"
         },
         "consumer": {
+          "chargeStatusB": "Standby",
           "energy": "Verbraucht",
           "returnEnergy": "Productioun"
         },

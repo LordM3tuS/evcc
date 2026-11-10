@@ -575,9 +575,27 @@ func TestOptimizerPhaseScaleUp(t *testing.T) {
 
 			// delay elapsed
 			clck.Add(lp.Enable.Delay)
-			phaseCharger.EXPECT().Phases1p3p(3).Return(nil)
 			_, err = lp.optimizerCharging(s)
 			assert.NoError(t, err)
+
+			// switching under load is deferred to the 0A safety
+			// sequence — the load is dropped to 0A, the physical switch waits for
+			// the safety buffer and an idle charger
+			assert.Equal(t, 3, lp.phaseSwitchTarget)
+			assert.Equal(t, 1, lp.GetPhases())
+			assert.False(t, lp.enabled)
+			assert.Equal(t, 0.0, lp.offeredCurrent)
+
+			// first idle tick anchors the safety buffer on the confirmed 0A
+			clck.Add(21 * time.Second)
+			lp.status = api.StatusB
+			assert.NoError(t, lp.advancePhaseSwitch())
+			assert.Equal(t, 1, lp.GetPhases(), "switch must wait for the anchored safety buffer")
+
+			// buffer elapsed at zero current and the charger is idle: the switch happens
+			clck.Add(21 * time.Second)
+			phaseCharger.EXPECT().Phases1p3p(3).Return(nil)
+			assert.NoError(t, lp.advancePhaseSwitch())
 			assert.Equal(t, 3, lp.GetPhases())
 		})
 	}
@@ -819,6 +837,9 @@ func TestOptimizerPhaseGap(t *testing.T) {
 
 			for range 5 {
 				clck.Add(time.Hour) // phase switch and delays elapsed
+				// complete any pending 0A safety sequence like the update loop
+				// would (advancePhaseSwitch runs before the optimizer decision)
+				completePendingPhaseSwitch(t, lp)
 				handled, err := lp.optimizerCharging(s)
 				assert.True(t, handled)
 				assert.NoError(t, err)

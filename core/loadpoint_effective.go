@@ -242,6 +242,13 @@ func (lp *Loadpoint) effectiveMaxCurrent() float64 {
 		}
 	}
 
+	// phase-dependent max current limit, e.g. TWC3
+	// delivers 18 A on 1 phase but only 16 A on 3 phases. A 1p vehicle on a
+	// 3p loadpoint is unaffected (active phases, not configured phases).
+	if lp.hasPhaseSwitching() && lp.activePhases() == 3 && lp.PhasesMaxCurrent3 > 0 {
+		maxCurrent = min(maxCurrent, lp.PhasesMaxCurrent3)
+	}
+
 	return maxCurrent
 }
 
@@ -315,7 +322,15 @@ func (lp *Loadpoint) EffectiveMaxPower() float64 {
 
 // effectiveMaxPower returns the effective max power taking vehicle capabilities and phase scaling into account
 func (lp *Loadpoint) effectiveMaxPower() float64 {
-	res := grid.CurrentToPower(lp.effectiveMaxCurrent(), lp.maxActivePhases())
+	// the estimate is for the maximum active phases: on 3 phases the
+	// 3-phase current cap applies even while the charger still runs on
+	// fewer phases (effectiveMaxCurrent only caps on the active phases)
+	maxPhases := lp.maxActivePhases()
+	maxCurrent := lp.effectiveMaxCurrent()
+	if lp.hasPhaseSwitching() && maxPhases == 3 && lp.PhasesMaxCurrent3 > 0 {
+		maxCurrent = min(maxCurrent, lp.PhasesMaxCurrent3)
+	}
+	res := grid.CurrentToPower(maxCurrent, maxPhases)
 	if lp.vehicle != nil {
 		if maxPower, ok := lp.vehicle.OnIdentified().GetMaxPower(); ok {
 			return min(maxPower, res)

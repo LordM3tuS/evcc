@@ -40,3 +40,23 @@ func TestSplitConfigAlwaysCharge(t *testing.T) {
 	assert.Equal(t, "on", dynamic.AlwaysCharge)
 	assert.NotContains(t, other, "alwaysCharge")
 }
+
+// TestSplitConfigPhasesHysteresis guards that the phase hysteresis keys
+// (phasesuppower/phasesdownpower) are routed to the dynamic config, so they are
+// applied live and never reach the strict static decode.
+func TestSplitConfigPhasesHysteresis(t *testing.T) {
+	payload := map[string]any{
+		"phasesuppower":   4140.0,
+		"phasesdownpower": 3000.0,
+	}
+
+	dynamic, other, err := SplitConfig(payload)
+	require.NoError(t, err)
+
+	require.NotNil(t, dynamic.PhasesUpPower)
+	require.NotNil(t, dynamic.PhasesDownPower)
+	assert.Equal(t, 4140.0, *dynamic.PhasesUpPower)
+	assert.Equal(t, 3000.0, *dynamic.PhasesDownPower)
+	assert.NotContains(t, other, "phasesuppower")
+	assert.NotContains(t, other, "phasesdownpower")
+}

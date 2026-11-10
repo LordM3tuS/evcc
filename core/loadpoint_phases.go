@@ -6,6 +6,7 @@ import (
 
 	"github.com/evcc-io/evcc/api"
 	"github.com/evcc-io/evcc/core/keys"
+	"github.com/evcc-io/evcc/util/grid"
 )
 
 // setPhasesConfigured sets the default phase configuration
@@ -213,6 +214,113 @@ func (lp *Loadpoint) syncChargerPhases(disabled bool) error {
 		}
 		lp.SetPhases(chargerPhases)
 	}
+
+	return nil
+}
+
+// GetPhasesUpPower returns the 1p→3p up-switch threshold in W (0 = default).
+func (lp *Loadpoint) GetPhasesUpPower() float64 {
+	lp.RLock()
+	defer lp.RUnlock()
+	return lp.PhasesUpPower
+}
+
+// GetPhasesDownPower returns the 3p→1p down-switch threshold in W (0 = default).
+func (lp *Loadpoint) GetPhasesDownPower() float64 {
+	lp.RLock()
+	defer lp.RUnlock()
+	return lp.PhasesDownPower
+}
+
+// SetPhasesHysteresis sets the 1p/3p switching thresholds in W (0 = default).
+// Explicit thresholds must form a hysteresis band (down below up) or the
+// switching would oscillate. For unset values (0, 0) the derived defaults
+// can overlap (e.g. 6-16 A: 16A x 230V < 6A x 3 x 230V); in that case the
+// defaults are kept with a warning, consistent with the YAML config path.
+func (lp *Loadpoint) SetPhasesHysteresis(up, down float64) error {
+	if up < 0 || down < 0 {
+		return fmt.Errorf("phase hysteresis: thresholds must not be negative (up: %.0f W, down: %.0f W)", up, down)
+	}
+	effUp := effectivePhasesUpThreshold(lp, up)
+	effDown := effectivePhasesDownThreshold(lp, down)
+	if effDown >= effUp {
+		if up == 0 && down == 0 {
+			lp.log.WARN.Printf("phase hysteresis: default down threshold (%.0fW) must be below up threshold (%.0fW), set explicit thresholds", effDown, effUp)
+		} else {
+			return fmt.Errorf("phase hysteresis: down threshold (%.0f W) must be below up threshold (%.0f W)", effDown, effUp)
+		}
+	}
+
+	lp.log.DEBUG.Printf("set phase hysteresis: up above %.0f W, down below %.0f W (0 = default)", up, down)
+
+	lp.Lock()
+	lp.PhasesUpPower = up
+	lp.PhasesDownPower = down
+	lp.Unlock()
+
+	lp.publish(keys.PhasesUpPower, up)
+	lp.publish(keys.PhasesDownPower, down)
+	lp.settings.SetFloat(keys.PhasesUpPower, up)
+	lp.settings.SetFloat(keys.PhasesDownPower, down)
+
+	return nil
+}
+
+// effectivePhasesUpThreshold returns the effective 1p→3p up threshold in W,
+// applying the derived default for an unset value
+func effectivePhasesUpThreshold(lp *Loadpoint, up float64) float64 {
+	if up > 0 {
+		return up
+	}
+	return grid.CurrentToPower(lp.GetMaxCurrent(), 1)
+}
+
+// effectivePhasesDownThreshold returns the effective 3p→1p down threshold in
+// W, applying the derived default for an unset value (3 phases as worst case)
+func effectivePhasesDownThreshold(lp *Loadpoint, down float64) float64 {
+	if down > 0 {
+		return down
+	}
+	return grid.CurrentToPower(lp.GetMinCurrent(), 3)
+}
+
+// GetPhasesMaxCurrent3 returns the 3-phase max charge current in A (0 = maxCurrent)
+func (lp *Loadpoint) GetPhasesMaxCurrent3() float64 {
+	lp.RLock()
+	defer lp.RUnlock()
+	return lp.PhasesMaxCurrent3
+}
+
+// SetPhasesMaxCurrent3 sets the 3-phase max charge current in A (0 = maxCurrent)
+func (lp *Loadpoint) SetPhasesMaxCurrent3(current float64) error {
+	if current < 0 {
+		return fmt.Errorf("phasesmaxcurrent3: current must not be negative (%.1f A)", current)
+	}
+
+	lp.RLock()
+	minCurrent := lp.minCurrent
+	maxCurrent := lp.maxCurrent
+	lp.RUnlock()
+
+	if current > 0 {
+		if current > maxCurrent {
+			lp.log.WARN.Printf("phasesmaxcurrent3 (%.1fA) above maxCurrent (%.1fA)", current, maxCurrent)
+		}
+		if current < minCurrent {
+			// a 3p cap below the min current would make setLimit fail while
+			// charging on 3 phases, so clamp to the min current
+			lp.log.WARN.Printf("phasesmaxcurrent3 (%.1fA) below minCurrent (%.1fA), using minCurrent", current, minCurrent)
+			current = minCurrent
+		}
+	}
+
+	lp.Lock()
+	lp.PhasesMaxCurrent3 = current
+	lp.Unlock()
+
+	lp.log.DEBUG.Printf("set phases max current 3p: %.1fA (0 = default)", current)
+	lp.publish(keys.PhasesMaxCurrent3, current)
+	lp.settings.SetFloat(keys.PhasesMaxCurrent3, current)
 
 	return nil
 }
